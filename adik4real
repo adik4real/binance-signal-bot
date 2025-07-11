@@ -1,18 +1,22 @@
 app = "binance-signal-bot"
-primary_region = "ams"
+primary_region = "fra"  
 
 [build]
-  image = "python:3.11-slim"
+  builder = "paketobuildpacks/builder:base"
 
 [env]
-  LANG = "ru_RU.UTF-8"
-  LANGUAGE = "ru:en"
-  LC_ALL = "ru_RU.UTF-8"
+  PYTHONUNBUFFERED = "1"
+  PORT = "8080"  
 
-[services]
-  [[services]]
-    internal_port = 8080
-    protocol = "tcp"
-    [[services.ports]]
-      handlers = ["http"]
-      port = 80
+[http_service]
+  internal_port = 8080  
+  force_https = true
+  auto_stop_machines = false
+
+  [[http_service.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[http_service.ports]]
+    handlers = ["tls", "http"]
+    port = 443
