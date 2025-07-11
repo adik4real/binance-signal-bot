@@ -5,8 +5,7 @@ primary_region = "ams"
   LANG = "ru_RU.UTF-8"
   LC_ALL = "ru_RU.UTF-8"
 
-[services]
- [[services]]
+[[services]]
   internal_port = 8080
   protocol = "tcp"
   [[services.ports]]
