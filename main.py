@@ -1,5 +1,11 @@
 import logging
-logging.basicConfig(level=logging.INFO)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s"
+)
+logger = logging.getLogger(__name__)
+logger.info("Бот запущен!")
 import os
 import logging
 from telegram import Update
