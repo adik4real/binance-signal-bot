@@ -1,17 +1,14 @@
 import os
-from dotenv import load_dotenv
-load_dotenv()
 import logging
-import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
+# Настройка логгирования
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s"
 )
 logger = logging.getLogger(__name__)
-logger.info("Бот запущен!")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Бот запущен!")
@@ -21,9 +18,15 @@ async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Ваш Chat ID: `{chat_id}`", parse_mode='Markdown')
 
 def main():
-    app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
+    token = os.getenv("TELEGRAM_TOKEN")
+    if not token:
+        logger.error("TELEGRAM_TOKEN не установлен!")
+        return
+
+    app = Application.builder().token(token).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("id", get_id))  # <-- внутри main
+    app.add_handler(CommandHandler("id", get_id))
+    
     logger.info("Starting bot...")
     try:
         app.run_polling()
@@ -32,39 +35,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-
-async def show_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляет пользователю его Chat ID"""
-    chat_id = update.message.chat.id
-    await update.message.reply_text(
-        f"🆔 Ваш Chat ID: `{chat_id}`\n"
-        f"💡 Используйте его для настройки уведомлений",
-        parse_mode='Markdown'
-    )
-
-def main():
-    app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
-    app.add_handler(CommandHandler("id", show_id))  # Новая команда
-    app.run_polling()
-    import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-
-async def show_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает Chat ID пользователя"""
-    chat_id = update.message.chat.id
-    await update.message.reply_text(f"🆔 Ваш Chat ID: `{chat_id}`", parse_mode='Markdown')
-
-def main():
-    app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
-    
-    # Добавляем обработчики команд
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("id", show_id))  # Новая команда
-    
-    app.run_polling()
-
 if __name__ == "__main__":
     main()
