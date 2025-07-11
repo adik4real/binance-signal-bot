@@ -1,0 +1,18 @@
+app = "binance-signal-bot"
+primary_region = "ams"
+
+[build]
+  image = "python:3.11-slim"
+
+[env]
+  LANG = "ru_RU.UTF-8"
+  LANGUAGE = "ru:en"
+  LC_ALL = "ru_RU.UTF-8"
+
+[services]
+  [[services]]
+    internal_port = 8080
+    protocol = "tcp"
+    [[services.ports]]
+      handlers = ["http"]
+      port = 80
