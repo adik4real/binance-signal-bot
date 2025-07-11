@@ -28,6 +28,4 @@ if __name__ == "__main__":
 async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat.id
     await update.message.reply_text(f"Ваш Chat ID: `{chat_id}`", parse_mode='Markdown')
-
-# Добавьте обработчик в main():
 app.add_handler(CommandHandler("id", get_id))
