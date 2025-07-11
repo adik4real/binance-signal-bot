@@ -29,3 +29,7 @@ async def get_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.message.chat.id
     await update.message.reply_text(f"Ваш Chat ID: `{chat_id}`", parse_mode='Markdown')
 app.add_handler(CommandHandler("id", get_id))
+try:
+    app.run_polling()
+except Exception as e:
+    logger.error(f"Ошибка запуска: {e}")
