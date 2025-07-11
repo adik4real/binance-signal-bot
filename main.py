@@ -9,6 +9,7 @@ BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
 
 client = Client(BINANCE_API_KEY, BINANCE_SECRET_KEY)
 PORT = int(os.environ.get('PORT', 8080))
+print(f"Бот запущен на порту {PORT}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🚀 Бот запущен! Используйте /signal")
