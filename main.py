@@ -1,25 +1,27 @@
 import os
+import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
-from binance.client import Client
 
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
-BINANCE_SECRET_KEY = os.getenv("BINANCE_SECRET_KEY")
-
-client = Client(BINANCE_API_KEY, BINANCE_SECRET_KEY)
-PORT = int(os.environ.get('PORT', 8080))
-print(f"Бот запущен на порту {PORT}")
+# Настройка логов
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🚀 Бот запущен! Используйте /signal")
+    """Отправляет сообщение при команде /start"""
+    await update.message.reply_text('🚀 Бот запущен!')
 
-async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    price = client.get_symbol_ticker(symbol="BTCUSDT")["price"]
-    await update.message.reply_text(f"📊 BTC/USDT: {price}")
-
-if __name__ == "__main__":
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+def main():
+    """Запуск бота"""
+    app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("signal", signal))
+    
+    # Режим опроса (для теста без вебхуков)
+    logger.info("Бот запущен в режиме polling...")
     app.run_polling()
+
+if __name__ == '__main__':
+    main()
