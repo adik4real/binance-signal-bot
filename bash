@@ -1,1 +1,0 @@
-flyctl secrets set TELEGRAM_TOKEN=7599133593:AAGxYog0xE6JynC1uSRYIQK_-jxi8Ybk8W0
