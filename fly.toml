@@ -1,0 +1,14 @@
+app = "binance-signal-bot-bgcwzg"
+primary_region = "ams"
+
+[env]
+  LANG = "ru_RU.UTF-8"
+  LC_ALL = "ru_RU.UTF-8"
+
+[services]
+  [[services]]
+    internal_port = 8080        # если у вас веб-сервер, иначе можно не указывать
+    protocol = "tcp"
+    [[services.ports]]
+      handlers = ["http"]
+      port = 80
