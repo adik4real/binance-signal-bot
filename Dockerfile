@@ -3,7 +3,6 @@ primary_region = "fra"
 
 [build]
   builder = "paketobuildpacks/builder:base"
-  # Опционально: укажи Python-билдпак явно
   buildpacks = ["gcr.io/paketo-buildpacks/python"]
 
 [http_service]
