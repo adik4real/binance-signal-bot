@@ -45,3 +45,23 @@ def main():
     app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
     app.add_handler(CommandHandler("id", show_id))  # Новая команда
     app.run_polling()
+    import os
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+async def show_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает Chat ID пользователя"""
+    chat_id = update.message.chat.id
+    await update.message.reply_text(f"🆔 Ваш Chat ID: `{chat_id}`", parse_mode='Markdown')
+
+def main():
+    app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
+    
+    # Добавляем обработчики команд
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("id", show_id))  # Новая команда
+    
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
