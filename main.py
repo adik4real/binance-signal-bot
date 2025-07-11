@@ -29,3 +29,19 @@ def main():
 
 if __name__ == "__main__":
     main()
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+async def show_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отправляет пользователю его Chat ID"""
+    chat_id = update.message.chat.id
+    await update.message.reply_text(
+        f"🆔 Ваш Chat ID: `{chat_id}`\n"
+        f"💡 Используйте его для настройки уведомлений",
+        parse_mode='Markdown'
+    )
+
+def main():
+    app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
+    app.add_handler(CommandHandler("id", show_id))  # Новая команда
+    app.run_polling()
