@@ -6,9 +6,9 @@ primary_region = "ams"
   LC_ALL = "ru_RU.UTF-8"
 
 [services]
-  [[services]]
-    internal_port = 8080        # если у вас веб-сервер, иначе можно не указывать
-    protocol = "tcp"
-    [[services.ports]]
-      handlers = ["http"]
-      port = 80
+ [[services]]
+  internal_port = 8080
+  protocol = "tcp"
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
