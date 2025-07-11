@@ -1,10 +1,6 @@
-app = "binance-signal-bot-s37rbq"
-primary_region = "fra"
-
-[build]
-  builder = "paketobuildpacks/builder:base"
-  buildpacks = ["gcr.io/paketo-buildpacks/python"]
-
-[http_service]
-  internal_port = 8080
-  force_https = true
+FROM python:3.9-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+CMD ["python", "main.py"]
