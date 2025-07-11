@@ -2,8 +2,11 @@ app = "binance-signal-bot-s37rbq"
 primary_region = "fra"
 
 [build]
-  dockerfile = "Dockerfile"  
+  dockerfile = "Dockerfile"
+
+[env]
+  TELEGRAM_TOKEN = "7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo"  
 
 [http_service]
-  internal_port = 8080  
+  internal_port = 8080
   force_https = true
