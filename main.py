@@ -2,12 +2,7 @@ import logging
 import os
 import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import aiohttp
 
 # Configuration
@@ -16,56 +11,64 @@ if not TOKEN:
     raise ValueError("BOT_TOKEN environment variable is not set")
 
 CHAT_ID = "970254189"
-COINS = ["BTCUSDT", "XRPUSDT", "SOLUSDT", "ADAUSDT", "ETHUSDT", "TONUSDT", "BNBUSDT"]
+COINS = ['BTCUSDT', 'XRPUSDT', 'SOLUSDT', 'ADAUSDT', 'ETHUSDT', 'TONUSDT', 'BNBUSDT']
 CHECK_INTERVAL = 60  # seconds
 
 # Logging setup
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-class BinanceTradingBot:
+class TradingBot:
     def __init__(self):
         self.signals_sent = {coin: None for coin in COINS}
-        self.http_session = None
-        self.application = None
+        self.session = None
+        self.app = None
 
-    async def initialize(self):
-        self.http_session = aiohttp.ClientSession()
-        self.application = Application.builder().token(TOKEN).build()
+    async def start(self):
+        """Initialize and run the bot"""
+        self.session = aiohttp.ClientSession()
+        self.app = Application.builder().token(TOKEN).build()
         
         # Register handlers
-        self.application.add_handler(CommandHandler("start", self.start_command))
-        self.application.add_handler(CallbackQueryHandler(self.button_handler))
+        self.app.add_handler(CommandHandler("start", self.start_command))
+        self.app.add_handler(CallbackQueryHandler(self.button_handler))
         
-        # Start background tasks
-        self.application.job_queue.run_repeating(
-            self.monitor_prices, interval=CHECK_INTERVAL, first=0.0
+        # Start price monitoring
+        self.app.job_queue.run_repeating(
+            self.monitor_prices, 
+            interval=CHECK_INTERVAL, 
+            first=0.0
         )
+        
+        # Run the bot
+        await self.app.run_polling()
 
     async def shutdown(self):
-        if self.http_session:
-            await self.http_session.close()
+        """Cleanup resources"""
+        if self.session:
+            await self.session.close()
         logger.info("Bot shutdown complete")
 
     async def get_ticker_data(self, symbol):
-        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
+        """Fetch ticker data from Binance"""
+        url = f'https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}'
         try:
-            async with self.http_session.get(url, timeout=5) as resp:
+            async with self.session.get(url, timeout=5) as resp:
                 if resp.status == 200:
                     return await resp.json()
                 logger.error(f"Binance API error for {symbol}: HTTP {resp.status}")
-                return None
         except Exception as e:
             logger.error(f"Error fetching data for {symbol}: {str(e)}")
-            return None
+        return None
 
-    async def get_rsi(self, symbol, interval="1h", limit=14):
-        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
+    async def get_rsi(self, symbol, interval='1h', limit=14):
+        """Calculate RSI for given symbol"""
+        url = f'https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}'
         try:
-            async with self.http_session.get(url, timeout=5) as resp:
+            async with self.session.get(url, timeout=5) as resp:
                 if resp.status != 200:
                     return None
                 data = await resp.json()
@@ -77,88 +80,91 @@ class BinanceTradingBot:
 
     @staticmethod
     def calculate_rsi(prices):
+        """Calculate RSI from price data"""
         if len(prices) < 14:
             return None
-
-        deltas = [prices[i] - prices[i - 1] for i in range(1, len(prices))]
+            
+        deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
         gains = [max(d, 0) for d in deltas]
         losses = [abs(min(d, 0)) for d in deltas]
-
+        
         avg_gain = sum(gains[:14]) / 14
         avg_loss = sum(losses[:14]) / 14
-
+        
         if avg_loss == 0:
             return 100
-
+            
         rs = avg_gain / avg_loss
         return round(100 - (100 / (1 + rs)), 2)
 
     async def send_signal(self, symbol, rsi, price):
+        """Send trading signal to Telegram"""
         if rsi is None:
             return
 
-        if rsi < 30 and self.signals_sent[symbol] != "long":
+        if rsi < 30 and self.signals_sent[symbol] != 'long':
             text = f"📈 LONG signal for {symbol}\nRSI: {rsi}\nPrice: {price} USDT"
-            self.signals_sent[symbol] = "long"
-        elif rsi > 70 and self.signals_sent[symbol] != "short":
+            self.signals_sent[symbol] = 'long'
+        elif rsi > 70 and self.signals_sent[symbol] != 'short':
             text = f"📉 SHORT signal for {symbol}\nRSI: {rsi}\nPrice: {price} USDT"
-            self.signals_sent[symbol] = "short"
+            self.signals_sent[symbol] = 'short'
         else:
             if 30 <= rsi <= 70:
                 self.signals_sent[symbol] = None
             return
-
+            
         try:
-            await self.application.bot.send_message(chat_id=CHAT_ID, text=text)
+            await self.app.bot.send_message(chat_id=CHAT_ID, text=text)
             logger.info(f"Signal sent for {symbol}")
         except Exception as e:
-            logger.error(f"Error sending signal for {symbol}: {str(e)}")
+            logger.error(f"Error sending signal: {str(e)}")
 
     async def monitor_prices(self, context: ContextTypes.DEFAULT_TYPE):
+        """Periodically check prices and send signals"""
         for coin in COINS:
             try:
                 data = await self.get_ticker_data(coin)
                 if not data:
                     continue
-
-                price = float(data["lastPrice"])
+                    
+                price = float(data['lastPrice'])
                 rsi = await self.get_rsi(coin)
                 await self.send_signal(coin, rsi, price)
             except Exception as e:
                 logger.error(f"Error processing {coin}: {str(e)}")
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        keyboard = [
-            [InlineKeyboardButton(coin[:-4], callback_data=coin)] for coin in COINS
-        ]
+        """Handle /start command"""
+        keyboard = [[InlineKeyboardButton(coin[:-4], callback_data=coin)] for coin in COINS]
         markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text("Select a coin:", reply_markup=markup)
 
     async def button_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle inline button presses"""
         query = update.callback_query
         await query.answer()
-
+        
         symbol = query.data
         data = await self.get_ticker_data(symbol)
         if not data:
             await query.edit_message_text("Error getting data.")
             return
-
-        price = data["lastPrice"]
-        volume = data["quoteVolume"]
+            
+        price = data['lastPrice']
+        volume = data['quoteVolume']
         rsi = await self.get_rsi(symbol)
         rsi_text = str(rsi) if rsi else "N/A"
-
+        
         await query.edit_message_text(
             f"{symbol[:-4]} data:\nPrice: {price} USDT\nVolume: {volume} USDT\nRSI: {rsi_text}"
         )
 
 async def run_bot():
-    bot = BinanceTradingBot()
+    """Main bot runner with proper cleanup"""
+    bot = TradingBot()
     try:
-        await bot.initialize()
-        await bot.application.run_polling()
-    except asyncio.CancelledError:
+        await bot.start()
+    except (asyncio.CancelledError, KeyboardInterrupt):
         pass
     except Exception as e:
         logger.error(f"Fatal error: {str(e)}")
@@ -166,6 +172,7 @@ async def run_bot():
         await bot.shutdown()
 
 def main():
+    """Entry point"""
     asyncio.run(run_bot())
 
 if __name__ == "__main__":
