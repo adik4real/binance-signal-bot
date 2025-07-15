@@ -165,7 +165,7 @@ def main():
     print("Импорты в глобальной области:", list(globals().keys()))
     print("threading module:", threading)
     
- е
+ 
     threading.Thread(target=run_http_server, daemon=True).start()
 
     app = Application.builder().token(TOKEN).build()
