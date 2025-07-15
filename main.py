@@ -77,7 +77,7 @@ async def monitor_prices(app):
             if rsi is None:
                 continue
             await send_signal(app, coin, rsi, price)
-        await asyncio.sleep(5)  # проверка каждые 5 секунд
+        await asyncio.sleep(5)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(coin[:-4], callback_data=coin)] for coin in COINS]
@@ -110,7 +110,7 @@ def main():
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(button))
 
-    # Обертка для job_queue — запускает корутину как задачу
+    # Запуск мониторинга через job_queue (обертка для запуска корутины)
     def job_callback(context):
         context.application.create_task(monitor_prices(app))
 
@@ -120,4 +120,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
