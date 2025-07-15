@@ -24,8 +24,6 @@ SL_PERCENT = 0.015
 
 last_signal = {}
 
-# Обработчики и функции (как у тебя) ...
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Монеты", callback_data="menu_coins")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -95,7 +93,6 @@ async def get_coin_details(symbol: str):
     }
 
 def calculate_rsi(prices, period=14):
-    import numpy as np
     deltas = np.diff(prices)
     seed = deltas[:period]
     up = seed[seed >= 0].sum() / period
@@ -161,9 +158,10 @@ def run_http_server():
         print(f"HTTP server running on port {PORT}")
         httpd.serve_forever()
 
-def main():
+async def main():
     print("Запуск бота...")
 
+    # Запускаем HTTP сервер в отдельном потоке, чтобы не блокировать asyncio loop
     threading.Thread(target=run_http_server, daemon=True).start()
 
     app = Application.builder().token(TOKEN).build()
@@ -171,9 +169,11 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
 
+    # Запускаем периодическую задачу по проверке сигналов каждую минуту
     app.job_queue.run_repeating(periodic_check, interval=60.0, first=0.0)
 
-    app.run_polling()
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
