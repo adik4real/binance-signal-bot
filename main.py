@@ -158,10 +158,9 @@ def run_http_server():
         print(f"HTTP server running on port {PORT}")
         httpd.serve_forever()
 
-async def main():
+def main():
     print("Запуск бота...")
 
-    # Запускаем HTTP сервер в отдельном потоке, чтобы не блокировать asyncio loop
     threading.Thread(target=run_http_server, daemon=True).start()
 
     app = Application.builder().token(TOKEN).build()
@@ -169,11 +168,9 @@ async def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # Запускаем периодическую задачу по проверке сигналов каждую минуту
     app.job_queue.run_repeating(periodic_check, interval=60.0, first=0.0)
 
-    await app.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
