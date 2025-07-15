@@ -1,47 +1,37 @@
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from aiogram import Bot, Dispatcher
-from aiogram.types import Message
-import asyncio
 import logging
-import os
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, JobQueue
 
-TOKEN = os.getenv("BOT_TOKEN")
+# Включаем логирование
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+# Твой токен от BotFather
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
 
-# — HTTP server —
-class SimpleHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is running")
+# Функция для команды /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Привет! Бот запущен.")
+    
+    # Запуск периодической задачи
+    context.job_queue.run_repeating(callback=job_callback, interval=60, first=10, chat_id=update.effective_chat.id)
 
-def run_http_server():
-    server = HTTPServer(('0.0.0.0', 8080), SimpleHandler)
-    logging.info("HTTP server running on port 8080")
-    server.serve_forever()
+# Периодическая задача
+async def job_callback(context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(chat_id=context.job.chat_id, text="Работаю!")
 
-# — Telegram handler —
-@dp.message()
-async def handle_message(message: Message):
-    await message.reply("Бот работает!")
-
-# — Telegram bot runner —
-def run_bot():
-    asyncio.run(dp.start_polling(bot))
-
-# — Main entry point —
 def main():
-    logging.basicConfig(level=logging.INFO)
+    # Создаем приложение
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Запускаем HTTP сервер в отдельном потоке
-    http_thread = threading.Thread(target=run_http_server, daemon=True)
-    http_thread.start()
+    # Регистрируем обработчики
+    app.add_handler(CommandHandler("start", start))
 
-    # Запускаем бота в основном потоке
-    run_bot()
+    # Запускаем бота
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
