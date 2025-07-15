@@ -2,6 +2,7 @@ import threading
 import os
 import http.server
 import socketserver
+import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -10,7 +11,7 @@ import httpx
 import numpy as np
 
 MY_CHAT_ID = 970254189
-TOKEN = os.getenv("TELEGRAM_TOKEN")  # Убедись, что токен в переменной окружения
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 COINS = {
     "XRPUSDT": "XRPUSDT",
@@ -158,13 +159,9 @@ def run_http_server():
         print(f"HTTP server running on port {PORT}")
         httpd.serve_forever()
 
-def main():
+def run_bot():
     print("Запуск бота...")
-
-    # Запускаем HTTP сервер в отдельном потоке
-    http_thread = threading.Thread(target=run_http_server, daemon=True)
-    http_thread.start()
-
+    
     # Создаем и настраиваем приложение
     app = Application.builder().token(TOKEN).build()
 
@@ -178,6 +175,13 @@ def main():
     # Запускаем бота
     app.run_polling()
 
+def main():
+    # Запускаем HTTP сервер в отдельном потоке
+    http_thread = threading.Thread(target=run_http_server, daemon=True)
+    http_thread.start()
+
+    # Запускаем бота в основном потоке
+    run_bot()
+
 if __name__ == "__main__":
-    # Убираем asyncio.run, так как run_polling уже управляет event loop
     main()
