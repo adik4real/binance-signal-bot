@@ -5,7 +5,7 @@ import socketserver
 import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue
 
 import httpx
 import numpy as np
@@ -173,14 +173,14 @@ async def main():
     # Запускаем HTTP сервер в отдельном потоке (опционально)
     threading.Thread(target=run_http_server, daemon=True).start()
 
-    app = Application.builder().token(TOKEN).job_queue(True).build()
-
+    # Инициализация приложения с JobQueue
+    app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
 
     # Запускаем периодическую задачу с интервалом 60 секунд
-    app.job_queue.run_repeating(periodic_check, interval=60, first=0)
+    app.job_queue.run_repeating(periodic_check, interval=60.0, first=0.0)
 
     await app.run_polling()
 
