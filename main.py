@@ -1,6 +1,9 @@
 import threading
 import asyncio
 import os
+import http.server
+import socketserver
+
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import httpx
@@ -150,8 +153,19 @@ async def periodic_signal_check(app):
         await check_signals(app)
         await asyncio.sleep(60)
 
+def run_http_server():
+    PORT = 8080
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", PORT), handler) as httpd:
+        print(f"HTTP server running on port {PORT}")
+        httpd.serve_forever()
+
 def main():
     print("Запуск бота...")
+
+    # Запускаем HTTP сервер в отдельном потоке
+    threading.Thread(target=run_http_server, daemon=True).start()
+
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
@@ -161,20 +175,7 @@ def main():
         asyncio.create_task(periodic_signal_check(app))
 
     app.post_init = on_post_init
-    import threading
-import http.server
-import socketserver
-
-def run_http_server():
-    PORT = 8080
-    handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", PORT), handler) as httpd:
-        print(f"HTTP server running on port {PORT}")
-        httpd.serve_forever()
-
-threading.Thread(target=run_http_server, daemon=True).start()
-
-app.run_polling()
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
