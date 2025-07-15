@@ -110,9 +110,9 @@ def main():
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(button))
 
-    # Запускаем мониторинг в фоне через job_queue
-    async def job_callback(context):
-        await monitor_prices(app)
+    # Обертка для job_queue — запускает корутину как задачу
+    def job_callback(context):
+        context.application.create_task(monitor_prices(app))
 
     app.job_queue.run_repeating(job_callback, interval=5, first=5)
 
@@ -120,3 +120,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
