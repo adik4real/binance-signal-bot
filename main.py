@@ -105,7 +105,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await query.edit_message_text(text=text)
 
-# Простой веб-сервер для Fly.io health check
+# Веб-сервер для Fly.io health check
 async def handle(request):
     return web.Response(text="Bot is running")
 
@@ -123,10 +123,7 @@ async def main():
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(button))
 
-    # Запускаем веб-сервер для Fly.io health check
     asyncio.create_task(start_web_server())
-
-    # Запускаем мониторинг цен в фоне
     asyncio.create_task(monitor_prices(app))
 
     await app.run_polling()
