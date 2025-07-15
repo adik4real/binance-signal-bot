@@ -2,7 +2,6 @@ import threading
 import os
 import http.server
 import socketserver
-import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -11,7 +10,7 @@ import httpx
 import numpy as np
 
 MY_CHAT_ID = 970254189
-TOKEN = os.getenv("TELEGRAM_TOKEN")  # Убедись, что переменная окружения установлена
+TOKEN = os.getenv("TELEGRAM_TOKEN")  # Проверь, что TELEGRAM_TOKEN установлен
 
 COINS = {
     "XRPUSDT": "XRPUSDT",
@@ -166,25 +165,21 @@ def run_http_server():
         print(f"HTTP server running on port {PORT}")
         httpd.serve_forever()
 
-# Главная функция с async запуском
-async def main():
+# Главная функция (синхронная)
+def main():
     print("Запуск бота...")
 
-    # Запускаем HTTP сервер в отдельном потоке (опционально)
     threading.Thread(target=run_http_server, daemon=True).start()
 
-    # Инициализация приложения с JobQueue
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # Запускаем периодическую задачу с интервалом 60 секунд
     app.job_queue.run_repeating(periodic_check, interval=60.0, first=0.0)
 
-    await app.run_polling()
+    # Блокирующий вызов запуска бота с встроенным event loop
+    app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    main()
