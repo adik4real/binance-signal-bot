@@ -25,31 +25,50 @@ class TradingBot:
     def __init__(self):
         self.signals_sent = {coin: None for coin in COINS}
         self.session = None
-        self.app = None
+        self.application = None
+        self.stop_event = asyncio.Event()
 
     async def start(self):
         """Initialize and run the bot"""
         self.session = aiohttp.ClientSession()
-        self.app = Application.builder().token(TOKEN).build()
+        self.application = Application.builder().token(TOKEN).build()
         
         # Register handlers
-        self.app.add_handler(CommandHandler("start", self.start_command))
-        self.app.add_handler(CallbackQueryHandler(self.button_handler))
+        self.application.add_handler(CommandHandler("start", self.start_command))
+        self.application.add_handler(CallbackQueryHandler(self.button_handler))
         
         # Start price monitoring
-        self.app.job_queue.run_repeating(
+        self.application.job_queue.run_repeating(
             self.monitor_prices, 
             interval=CHECK_INTERVAL, 
             first=0.0
         )
         
+        # Start HTTP server for health checks
+        asyncio.create_task(self.run_health_check())
+        
         # Run the bot
-        await self.app.run_polling()
+        await self.application.run_polling(stop_signals=[])
+
+    async def run_health_check(self):
+        """Simple HTTP server for health checks"""
+        async def handle(request):
+            return aiohttp.web.Response(text="OK")
+
+        app = aiohttp.web.Application()
+        app.router.add_get('/', handle)
+        runner = aiohttp.web.AppRunner(app)
+        await runner.setup()
+        site = aiohttp.web.TCPSite(runner, '0.0.0.0', 8080)
+        await site.start()
+        logger.info("Health check server running on port 8080")
 
     async def shutdown(self):
         """Cleanup resources"""
         if self.session:
             await self.session.close()
+        if self.application:
+            await self.application.shutdown()
         logger.info("Bot shutdown complete")
 
     async def get_ticker_data(self, symbol):
@@ -64,41 +83,22 @@ class TradingBot:
             logger.error(f"Error fetching data for {symbol}: {str(e)}")
         return None
 
-    async def get_rsi(self, symbol, interval='1h', limit=14):
-        """Calculate RSI for given symbol"""
-        url = f'https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}'
-        try:
-            async with self.session.get(url, timeout=5) as resp:
-                if resp.status != 200:
-                    return None
-                data = await resp.json()
-                closes = [float(c[4]) for c in data]
-                return self.calculate_rsi(closes)
-        except Exception as e:
-            logger.error(f"Error fetching RSI for {symbol}: {str(e)}")
-            return None
-
-    @staticmethod
-    def calculate_rsi(prices):
-        """Calculate RSI from price data"""
-        if len(prices) < 14:
-            return None
-            
-        deltas = [prices[i] - prices[i-1] for i in range(1, len(prices))]
-        gains = [max(d, 0) for d in deltas]
-        losses = [abs(min(d, 0)) for d in deltas]
-        
-        avg_gain = sum(gains[:14]) / 14
-        avg_loss = sum(losses[:14]) / 14
-        
-        if avg_loss == 0:
-            return 100
-            
-        rs = avg_gain / avg_loss
-        return round(100 - (100 / (1 + rs)), 2)
+    async def monitor_prices(self, context: ContextTypes.DEFAULT_TYPE):
+        """Check prices and send signals"""
+        for coin in COINS:
+            try:
+                data = await self.get_ticker_data(coin)
+                if not data:
+                    continue
+                    
+                price = float(data['lastPrice'])
+                rsi = await self.get_rsi(coin)
+                await self.send_signal(coin, rsi, price)
+            except Exception as e:
+                logger.error(f"Error processing {coin}: {str(e)}")
 
     async def send_signal(self, symbol, rsi, price):
-        """Send trading signal to Telegram"""
+        """Send trading signal if conditions are met"""
         if rsi is None:
             return
 
@@ -114,24 +114,10 @@ class TradingBot:
             return
             
         try:
-            await self.app.bot.send_message(chat_id=CHAT_ID, text=text)
+            await self.application.bot.send_message(chat_id=CHAT_ID, text=text)
             logger.info(f"Signal sent for {symbol}")
         except Exception as e:
             logger.error(f"Error sending signal: {str(e)}")
-
-    async def monitor_prices(self, context: ContextTypes.DEFAULT_TYPE):
-        """Periodically check prices and send signals"""
-        for coin in COINS:
-            try:
-                data = await self.get_ticker_data(coin)
-                if not data:
-                    continue
-                    
-                price = float(data['lastPrice'])
-                rsi = await self.get_rsi(coin)
-                await self.send_signal(coin, rsi, price)
-            except Exception as e:
-                logger.error(f"Error processing {coin}: {str(e)}")
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
@@ -159,8 +145,8 @@ class TradingBot:
             f"{symbol[:-4]} data:\nPrice: {price} USDT\nVolume: {volume} USDT\nRSI: {rsi_text}"
         )
 
-async def run_bot():
-    """Main bot runner with proper cleanup"""
+async def main():
+    """Entry point with proper error handling"""
     bot = TradingBot()
     try:
         await bot.start()
@@ -171,9 +157,5 @@ async def run_bot():
     finally:
         await bot.shutdown()
 
-def main():
-    """Entry point"""
-    asyncio.run(run_bot())
-
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
