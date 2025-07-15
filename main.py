@@ -2,6 +2,7 @@ import threading
 import os
 import http.server
 import socketserver
+import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -10,7 +11,7 @@ import httpx
 import numpy as np
 
 MY_CHAT_ID = 970254189
-TOKEN = os.getenv("TELEGRAM_TOKEN")
+TOKEN = os.getenv("TELEGRAM_TOKEN")  # Убедись, что переменная окружения установлена
 
 COINS = {
     "XRPUSDT": "XRPUSDT",
@@ -165,8 +166,8 @@ def run_http_server():
         print(f"HTTP server running on port {PORT}")
         httpd.serve_forever()
 
-# Главная функция
-def main():
+# Главная функция с async запуском
+async def main():
     print("Запуск бота...")
 
     # Запускаем HTTP сервер в отдельном потоке (опционально)
@@ -180,7 +181,7 @@ def main():
     # Запускаем периодическую задачу с интервалом 60 секунд
     app.job_queue.run_repeating(periodic_check, interval=60, first=0)
 
-    app.run_polling()
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
