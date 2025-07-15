@@ -1,12 +1,29 @@
-app = "binance-signal-bot-s37rbq-nameless-sea-1323"
+app = "binance-signal-bot"
+
+kill_signal = "SIGINT"
+kill_timeout = 5
 
 [env]
-  TELEGRAM_TOKEN = "7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo"
-  FLY_APP_NAME = "binance-signal-bot-s37rbq-nameless-sea-1323"
+  PORT = "8080"
 
-[http_service]
+[experimental]
+  allowed_public_ports = [8080]
+  auto_rollback = true
+
+[deploy]
+  release_command = ""
+
+[build]
+  image = "registry.fly.io/binance-signal-bot:latest"
+
+[[services]]
   internal_port = 8080
-  force_https = true
-  auto_stop_machines = false
-  auto_start_machines = true
-  min_machines_running = 1
+  protocol = "tcp"
+
+  [[services.ports]]
+    port = 8080
+
+  [[services.tcp_checks]]
+    interval = 10000
+    timeout = 2000
+    restart_limit = 0
