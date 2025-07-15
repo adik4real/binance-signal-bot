@@ -9,7 +9,6 @@ CHAT_ID = '970254189'
 COINS = ['BTCUSDT', 'XRPUSDT', 'SOLUSDT', 'ADAUSDT', 'ETHUSDT', 'TONUSDT', 'BNBUSDT']
 
 logging.basicConfig(level=logging.INFO)
-
 signals_sent = {coin: None for coin in COINS}
 
 async def get_binance_data(symbol):
@@ -68,15 +67,17 @@ async def send_signal(app, symbol, rsi, price):
         await app.bot.send_message(chat_id=chat_id, text=message)
 
 async def monitor_prices(app):
-    for coin in COINS:
-        data = await get_binance_data(coin)
-        if not data:
-            continue
-        price = float(data['lastPrice'])
-        rsi = await get_rsi(coin)
-        if rsi is None:
-            continue
-        await send_signal(app, coin, rsi, price)
+    while True:
+        for coin in COINS:
+            data = await get_binance_data(coin)
+            if not data:
+                continue
+            price = float(data['lastPrice'])
+            rsi = await get_rsi(coin)
+            if rsi is None:
+                continue
+            await send_signal(app, coin, rsi, price)
+        await asyncio.sleep(5)  # проверка каждые 5 секунд
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton(coin[:-4], callback_data=coin)] for coin in COINS]
@@ -109,7 +110,7 @@ def main():
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(button))
 
-    # Запуск мониторинга через job_queue каждые 5 секунд
+    # Запуск мониторинга в фоне через job_queue
     app.job_queue.run_repeating(lambda ctx: asyncio.create_task(monitor_prices(app)), interval=5, first=5)
 
     app.run_polling()
