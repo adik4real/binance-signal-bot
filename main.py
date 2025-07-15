@@ -161,18 +161,23 @@ def run_http_server():
 def main():
     print("Запуск бота...")
 
-    threading.Thread(target=run_http_server, daemon=True).start()
+    # Запускаем HTTP сервер в отдельном потоке
+    http_thread = threading.Thread(target=run_http_server, daemon=True)
+    http_thread.start()
 
+    # Создаем и настраиваем приложение
     app = Application.builder().token(TOKEN).build()
 
+    # Добавляем обработчики
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
 
+    # Настраиваем периодическую проверку
     app.job_queue.run_repeating(periodic_check, interval=60.0, first=0.0)
 
+    # Запускаем бота
     app.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    # Убираем asyncio.run, так как run_polling уже управляет event loop
+    main()
