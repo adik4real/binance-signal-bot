@@ -4,9 +4,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 import aiohttp
 
-TOKEN = 'твой_бот_токен_здесь'
-CHAT_ID = твой_чат_id_или_группа_куда_отправлять_сигналы (например, int)
-
+TOKEN = '7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo'
+CHAT_ID = '970254189'
 # Монеты для мониторинга и отображения
 COINS = ['BTCUSDT', 'XRPUSDT', 'SOLUSDT', 'ADAUSDT', 'ETHUSDT', 'TONUSDT', 'BNBUSDT']
 
