@@ -1,20 +1,15 @@
-import asyncio
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 import aiohttp
+import asyncio
 
 TOKEN = '7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo'
 CHAT_ID = '970254189'
-# Монеты для мониторинга и отображения
 COINS = ['BTCUSDT', 'XRPUSDT', 'SOLUSDT', 'ADAUSDT', 'ETHUSDT', 'TONUSDT', 'BNBUSDT']
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+logging.basicConfig(level=logging.INFO)
 
-# Хранение состояний сигналов, чтобы не спамить
 signals_sent = {coin: None for coin in COINS}
 
 async def get_binance_data(symbol):
@@ -27,13 +22,12 @@ async def get_binance_data(symbol):
                 return None
 
 async def get_rsi(symbol, interval='1m', limit=14):
-    # Получаем свечи для расчета RSI
     url = f'https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}'
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             if resp.status == 200:
                 data = await resp.json()
-                closes = [float(candle[4]) for candle in data]  # цена закрытия
+                closes = [float(candle[4]) for candle in data]
                 return calculate_rsi(closes)
             else:
                 return None
@@ -45,12 +39,8 @@ def calculate_rsi(prices):
     losses = []
     for i in range(1, len(prices)):
         delta = prices[i] - prices[i-1]
-        if delta >= 0:
-            gains.append(delta)
-            losses.append(0)
-        else:
-            gains.append(0)
-            losses.append(abs(delta))
+        gains.append(max(delta, 0))
+        losses.append(abs(min(delta, 0)))
     avg_gain = sum(gains) / 14
     avg_loss = sum(losses) / 14
     if avg_loss == 0:
@@ -70,7 +60,6 @@ async def send_signal(app, symbol, rsi, price):
         message = f"📉 Сигнал SHORT на {symbol}\nRSI: {rsi}\nЦена: {price} USDT"
         signals_sent[symbol] = 'short'
     else:
-        # Если RSI в норме - сбрасываем состояние, чтобы можно было отправить сигнал позже
         if 30 <= rsi <= 70:
             signals_sent[symbol] = None
         return
@@ -79,22 +68,18 @@ async def send_signal(app, symbol, rsi, price):
         await app.bot.send_message(chat_id=chat_id, text=message)
 
 async def monitor_prices(app):
-    while True:
-        for coin in COINS:
-            data = await get_binance_data(coin)
-            if not data:
-                continue
-            price = float(data['lastPrice'])
-            rsi = await get_rsi(coin)
-            if rsi is None:
-                continue
-            await send_signal(app, coin, rsi, price)
-        await asyncio.sleep(5)  # проверка каждые 5 секунд
+    for coin in COINS:
+        data = await get_binance_data(coin)
+        if not data:
+            continue
+        price = float(data['lastPrice'])
+        rsi = await get_rsi(coin)
+        if rsi is None:
+            continue
+        await send_signal(app, coin, rsi, price)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton(coin[:-4], callback_data=coin)] for coin in COINS
-    ]
+    keyboard = [[InlineKeyboardButton(coin[:-4], callback_data=coin)] for coin in COINS]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Выберите монету:', reply_markup=reply_markup)
 
@@ -106,7 +91,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not data:
         await query.edit_message_text(text="Ошибка получения данных.")
         return
-
     price = data['lastPrice']
     volume = data['quoteVolume']
     rsi = await get_rsi(symbol)
@@ -119,17 +103,16 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await query.edit_message_text(text=text)
 
-async def main():
+def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(button))
 
-    # Запускаем мониторинг в фоне
-    asyncio.create_task(monitor_prices(app))
+    # Запуск мониторинга через job_queue каждые 5 секунд
+    app.job_queue.run_repeating(lambda ctx: asyncio.create_task(monitor_prices(app)), interval=5, first=5)
 
-    await app.run_polling()
+    app.run_polling()
 
 if __name__ == '__main__':
-    import asyncio
-    asyncio.run(main())
+    main()
