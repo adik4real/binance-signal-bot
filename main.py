@@ -159,13 +159,10 @@ def run_http_server():
     with socketserver.TCPServer(("", PORT), handler) as httpd:
         print(f"HTTP server running on port {PORT}")
         httpd.serve_forever()
+
 def main():
     print("Запуск бота...")
 
-    print("Импорты в глобальной области:", list(globals().keys()))
-    print("threading module:", threading)
-    
- 
     threading.Thread(target=run_http_server, daemon=True).start()
 
     app = Application.builder().token(TOKEN).build()
@@ -178,7 +175,6 @@ def main():
 
     app.post_init = on_post_init
     app.run_polling()
-)
 
 if __name__ == "__main__":
     main()
