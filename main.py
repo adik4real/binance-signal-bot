@@ -5,13 +5,13 @@ import socketserver
 import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 import httpx
 import numpy as np
 
 MY_CHAT_ID = 970254189
-TOKEN = os.getenv("TELEGRAM_TOKEN")  # Убедись, что переменная окружения установлена
+TOKEN = os.getenv("TELEGRAM_TOKEN")  # Убедитесь, что установлена переменная окружения TELEGRAM_TOKEN
 
 COINS = {
     "XRPUSDT": "XRPUSDT",
@@ -25,13 +25,11 @@ SL_PERCENT = 0.015
 
 last_signal = {}
 
-# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Монеты", callback_data="menu_coins")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Главное меню:", reply_markup=reply_markup)
 
-# Обработка кнопок меню
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -65,7 +63,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Главное меню:", reply_markup=reply_markup)
 
-# Получение данных монеты с Binance
 async def get_coin_details(symbol: str):
     url_klines = "https://api.binance.com/api/v3/klines"
     params_klines = {"symbol": symbol, "interval": "1h", "limit": RSI_PERIOD + 1}
@@ -96,7 +93,6 @@ async def get_coin_details(symbol: str):
         "price_change_percent": price_change_percent,
     }
 
-# Расчет RSI
 def calculate_rsi(prices, period=14):
     deltas = np.diff(prices)
     seed = deltas[:period]
@@ -121,7 +117,6 @@ def calculate_rsi(prices, period=14):
 
     return rsi
 
-# Проверка торговых сигналов
 async def check_signals(app):
     global last_signal
     for symbol in COINS.keys():
@@ -154,11 +149,9 @@ async def check_signals(app):
             await app.bot.send_message(chat_id=MY_CHAT_ID, text=msg)
             print("Отправлен сигнал:", msg)
 
-# Функция для JobQueue - периодическая проверка сигналов
 async def periodic_check(context: ContextTypes.DEFAULT_TYPE):
     await check_signals(context.application)
 
-# Запуск HTTP сервера (если нужен)
 def run_http_server():
     PORT = 8080
     handler = http.server.SimpleHTTPRequestHandler
@@ -166,23 +159,25 @@ def run_http_server():
         print(f"HTTP server running on port {PORT}")
         httpd.serve_forever()
 
-# Главная функция с async запуском
 async def main():
     print("Запуск бота...")
-
-    # Запускаем HTTP сервер в отдельном потоке (опционально)
     threading.Thread(target=run_http_server, daemon=True).start()
 
-    # Инициализация приложения с JobQueue
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
-
-    # Запускаем периодическую задачу с интервалом 60 секунд
     app.job_queue.run_repeating(periodic_check, interval=60.0, first=0.0)
 
     await app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except RuntimeError as e:
+        if "event loop is running" in str(e):
+            loop = asyncio.get_event_loop()
+            loop.create_task(main())
+            loop.run_forever()
+        else:
+            raise
