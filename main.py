@@ -3,6 +3,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 import aiohttp
 import asyncio
+from aiohttp import web
 
 TOKEN = '7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo'
 CHAT_ID = '970254189'
@@ -104,16 +105,31 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await query.edit_message_text(text=text)
 
-def main():
+# Простой веб-сервер для Fly.io health check
+async def handle(request):
+    return web.Response(text="Bot is running")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8080)
+    await site.start()
+
+async def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(button))
 
-    # Запуск мониторинга в фоне через job_queue
-    app.job_queue.run_repeating(lambda ctx: asyncio.create_task(monitor_prices(app)), interval=5, first=5)
+    # Запускаем веб-сервер для Fly.io health check
+    asyncio.create_task(start_web_server())
 
-    app.run_polling()
+    # Запускаем мониторинг цен в фоне
+    asyncio.create_task(monitor_prices(app))
+
+    await app.run_polling()
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
