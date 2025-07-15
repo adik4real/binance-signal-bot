@@ -2,28 +2,36 @@ app = "binance-signal-bot-s37rbq-nameless-sea-1323"
 
 kill_signal = "SIGINT"
 kill_timeout = 5
+processes = []
 
 [env]
-  PORT = "8080"
 
-[experimental]
-  allowed_public_ports = [8080]
-  auto_rollback = true
-
-[deploy]
-  release_command = ""
+# TOKEN = "7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo"
+# CHAT_ID = "970254189"
 
 [build]
-  image = "registry.fly.io/binance-signal-bot:latest"
+ 
+  # Например, чтобы явно использовать Dockerfile:
+  dockerfile = "Dockerfile"
 
 [[services]]
   internal_port = 8080
   protocol = "tcp"
 
-  [[services.ports]]
-    port = 8080
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
 
-  [[services.tcp_checks]]
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+
+  [[services.ports]]
+    handlers = ["tls", "http"]
+    port = 443
+
+  [services.tcp_checks]
     interval = 10000
     timeout = 2000
+    grace_period = "5s"
     restart_limit = 0
