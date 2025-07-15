@@ -2,7 +2,6 @@ import threading
 import os
 import http.server
 import socketserver
-import asyncio
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -10,8 +9,9 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 import httpx
 import numpy as np
 
+# Константы
 MY_CHAT_ID = 970254189
-TOKEN = os.getenv("TELEGRAM_TOKEN")
+TOKEN = os.getenv("TELEGRAM_TOKEN")  # Убедись, что переменная окружения установлена
 
 COINS = {
     "XRPUSDT": "XRPUSDT",
@@ -25,11 +25,13 @@ SL_PERCENT = 0.015
 
 last_signal = {}
 
+# Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [[InlineKeyboardButton("Монеты", callback_data="menu_coins")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Главное меню:", reply_markup=reply_markup)
 
+# Обработка кнопок
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -63,6 +65,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Главное меню:", reply_markup=reply_markup)
 
+# Получение данных с Binance
 async def get_coin_details(symbol: str):
     url_klines = "https://api.binance.com/api/v3/klines"
     params_klines = {"symbol": symbol, "interval": "1h", "limit": RSI_PERIOD + 1}
@@ -93,6 +96,7 @@ async def get_coin_details(symbol: str):
         "price_change_percent": price_change_percent,
     }
 
+# RSI расчет
 def calculate_rsi(prices, period=14):
     deltas = np.diff(prices)
     seed = deltas[:period]
@@ -117,6 +121,7 @@ def calculate_rsi(prices, period=14):
 
     return rsi
 
+# Проверка сигналов
 async def check_signals(app):
     global last_signal
     for symbol in COINS.keys():
@@ -149,38 +154,36 @@ async def check_signals(app):
             await app.bot.send_message(chat_id=MY_CHAT_ID, text=msg)
             print("Отправлен сигнал:", msg)
 
+# Задание для JobQueue
 async def periodic_check(context: ContextTypes.DEFAULT_TYPE):
     await check_signals(context.application)
 
+# HTTP сервер
 def run_http_server():
     PORT = 8080
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", PORT), handler) as httpd:
-        print(f"HTTP server running on port {PORT}")
+        print(f"HTTP сервер запущен на порту {PORT}")
         httpd.serve_forever()
 
+# Запуск Telegram-бота
 def run_bot():
     print("Запуск бота...")
-    
-    # Создаем и настраиваем приложение
+
     app = Application.builder().token(TOKEN).build()
 
-    # Добавляем обработчики
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # Настраиваем периодическую проверку
     app.job_queue.run_repeating(periodic_check, interval=60.0, first=0.0)
 
-    # Запускаем бота
     app.run_polling()
 
+# Главная функция
 def main():
-    # Запускаем HTTP сервер в отдельном потоке
     http_thread = threading.Thread(target=run_http_server, daemon=True)
     http_thread.start()
 
-    # Запускаем бота в основном потоке
     run_bot()
 
 if __name__ == "__main__":
