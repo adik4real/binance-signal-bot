@@ -1,39 +1,31 @@
-import os
 import asyncio
-from telegram.ext import Application, CommandHandler
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes
+import logging
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = "7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo"
+COINS = ["BTCUSDT", "ETHUSDT"]  # тест
 
-async def start(update, context):
-    await update.message.reply_text("Бот запущен и работает!")
+logging.basicConfig(level=logging.INFO)
 
-async def run_bot():
-    # Создаем приложение
-    app = Application.builder().token(TOKEN).build()
-    
-    # Добавляем обработчик команды /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[InlineKeyboardButton("Hello", callback_data="test")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Бот запущен!", reply_markup=reply_markup)
+
+async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(text="Ты нажал кнопку!")
+
+async def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
-    
-    # Запускаем бота
-    await app.initialize()
-    await app.start()
-    print("Бот успешно запущен")
-    
-    # Бесконечный цикл для поддержания работы
-    while True:
-        await asyncio.sleep(3600)  # Спим 1 час
+    app.add_handler(CallbackQueryHandler(button))
 
-    # Эти строки никогда не выполнятся, но оставляем для правильной структуры
-    await app.stop()
-    await app.shutdown()
-
-def main():
-    try:
-        asyncio.run(run_bot())
-    except KeyboardInterrupt:
-        print("Бот остановлен пользователем")
-    except Exception as e:
-        print(f"Ошибка: {e}")
+    print("✅ Бот запущен")
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
