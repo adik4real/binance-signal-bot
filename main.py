@@ -3,6 +3,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, CallbackQueryHandler
 import aiohttp
 import asyncio
+from aiohttp import web
+import os
 
 TOKEN = '7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo'
 CHAT_ID = '970254189'
@@ -104,17 +106,32 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await query.edit_message_text(text=text)
 
+async def http_handler(request):
+    return web.Response(text="Bot is running")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', http_handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CallbackQueryHandler(button))
 
-    # Запуск мониторинга через job_queue (обертка для запуска корутины)
     def job_callback(context):
         context.application.create_task(monitor_prices(app))
 
     app.job_queue.run_repeating(job_callback, interval=5, first=5)
+
+    # Запускаем веб сервер вместе с ботом
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_web_server())
 
     app.run_polling()
 
