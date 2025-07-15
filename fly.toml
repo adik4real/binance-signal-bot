@@ -1,15 +1,180 @@
-app = "binance-signal-bot-s37rbq-nameless-sea-1323"
+import asyncio
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+import httpx
+import numpy as np
 
-[env]
-  TELEGRAM_TOKEN = "7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo"
-  FLY_APP_NAME = "binance-signal-bot-s37rbq-nameless-sea-1323"
+MY_CHAT_ID = 970254189
 
-[http_service]
-  internal_port = 8080
-  force_https = true
-  auto_stop_machines = true
-  auto_start_machines = true
-  min_machines_running = 1
+# Временно прописываем токен явно для проверки
+TOKEN = "7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo"
 
-[deploy]
-  region = "fra"
+COINS = {
+    "XRPUSDT": "XRPUSDT",
+    "BTCUSDT": "BTCUSDT",
+    "ETHUSDT": "ETHUSDT"
+}
+
+RSI_PERIOD = 14
+TP_PERCENT = 0.03  # Take Profit +3%
+SL_PERCENT = 0.015 # Stop Loss -1.5%
+
+last_signal = {}
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = [[InlineKeyboardButton("Монеты", callback_data="menu_coins")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Главное меню:", reply_markup=reply_markup)
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+
+    if data == "menu_coins":
+        keyboard = [[InlineKeyboardButton(coin[:-4], callback_data=f"coin_{coin}")] for coin in COINS.keys()]
+        keyboard.append([InlineKeyboardButton("Назад", callback_data="back_main")])
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("Выберите монету:", reply_markup=reply_markup)
+
+    elif data.startswith("coin_"):
+        symbol = data.split("_")[1]
+        details = await get_coin_details(symbol)
+        if details is None:
+            text = "Ошибка получения данных с Binance"
+        else:
+            text = (
+                f"Монета: {symbol[:-4]}\n"
+                f"Цена: ${details['price']:.4f}\n"
+                f"RSI (14): {details['rsi']:.2f}\n"
+                f"Объем (24ч): {details['volume_24h']:.2f}\n"
+                f"Изменение (24ч): {details['price_change_percent']:.2f}%"
+            )
+        keyboard = [[InlineKeyboardButton("Назад", callback_data="menu_coins")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(text, reply_markup=reply_markup)
+
+    elif data == "back_main":
+        keyboard = [[InlineKeyboardButton("Монеты", callback_data="menu_coins")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text("Главное меню:", reply_markup=reply_markup)
+
+async def get_coin_details(symbol: str):
+    url_klines = "https://api.binance.com/api/v3/klines"
+    params_klines = {"symbol": symbol, "interval": "1h", "limit": RSI_PERIOD + 1}
+
+    url_ticker = "https://api.binance.com/api/v3/ticker/24hr"
+    params_ticker = {"symbol": symbol}
+
+    async with httpx.AsyncClient() as client:
+        resp_klines = await client.get(url_klines, params=params_klines)
+        resp_ticker = await client.get(url_ticker, params=params_ticker)
+
+        if resp_klines.status_code != 200 or resp_ticker.status_code != 200:
+            return None
+
+        klines = resp_klines.json()
+        ticker = resp_ticker.json()
+
+    closes = [float(candle[4]) for candle in klines]
+    rsi = calculate_rsi(closes, RSI_PERIOD)
+    last_price = closes[-1]
+
+    volume_24h = float(ticker.get("volume", 0))
+    price_change_percent = float(ticker.get("priceChangePercent", 0))
+
+    return {
+        "price": last_price,
+        "rsi": rsi,
+        "volume_24h": volume_24h,
+        "price_change_percent": price_change_percent,
+    }
+
+def calculate_rsi(prices, period=14):
+    deltas = np.diff(prices)
+    seed = deltas[:period]
+    up = seed[seed >= 0].sum() / period
+    down = -seed[seed < 0].sum() / period
+    if down == 0:
+        return 100.0
+    rs = up / down
+    rsi = 100.0 - (100.0 / (1.0 + rs))
+
+    for delta in deltas[period:]:
+        if delta > 0:
+            upval = delta
+            downval = 0.0
+        else:
+            upval = 0.0
+            downval = -delta
+
+        up = (up * (period - 1) + upval) / period
+        down = (down * (period - 1) + downval) / period
+
+        if down == 0:
+            return 100.0
+        rs = up / down
+        rsi = 100.0 - (100.0 / (1.0 + rs))
+
+    return rsi
+
+async def check_signals(app):
+    global last_signal
+    for symbol in COINS.keys():
+        details = await get_coin_details(symbol)
+        if not details:
+            continue
+
+        price = details['price']
+        rsi = details['rsi']
+
+        signal = None
+        if rsi < 30:
+            signal = "LONG"
+        elif rsi > 70:
+            signal = "SHORT"
+
+        if signal and last_signal.get(symbol) != signal:
+            last_signal[symbol] = signal
+
+            if signal == "LONG":
+                tp = price * (1 + TP_PERCENT)
+                sl = price * (1 - SL_PERCENT)
+            else:
+                tp = price * (1 - TP_PERCENT)
+                sl = price * (1 + SL_PERCENT)
+
+            msg = (
+                f"Сигнал по {symbol[:-4]}: {signal}\n"
+                f"Цена входа: ${price:.2f}\n"
+                f"Take Profit: ${tp:.2f}\n"
+                f"Stop Loss: ${sl:.2f}\n"
+                f"RSI: {rsi:.2f}"
+            )
+            await app.bot.send_message(chat_id=MY_CHAT_ID, text=msg)
+            print("Отправлен сигнал:", msg)
+
+async def periodic_signal_check(app):
+    while True:
+        await check_signals(app)
+        await asyncio.sleep(60)  # Проверяем каждую минуту
+
+def main():
+    print("Запуск бота...")
+
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+
+    # Здесь добавляем post_init для запуска периодической задачи
+    async def on_post_init(app):
+        print("Запускаем периодическую проверку сигналов...")
+        asyncio.create_task(periodic_signal_check(app))
+
+    app.post_init = on_post_init
+
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
