@@ -173,7 +173,8 @@ async def main():
     # Запускаем HTTP сервер в отдельном потоке (опционально)
     threading.Thread(target=run_http_server, daemon=True).start()
 
-    app = Application.builder().token(TOKEN).build()
+    app = Application.builder().token(TOKEN).job_queue(True).build()
+
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
