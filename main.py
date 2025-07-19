@@ -1,31 +1,55 @@
+import os
 import asyncio
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes
-import logging
+from aiohttp import web
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
 
-TOKEN = "7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo"
-COINS = ["BTCUSDT", "ETHUSDT"]  # тест
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
+WEBHOOK_URL = f"https://{WEBHOOK_HOST}{WEBHOOK_PATH}"
+PORT = int(os.getenv("PORT", 8080))
 
-logging.basicConfig(level=logging.INFO)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton("Hello", callback_data="test")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Бот запущен!", reply_markup=reply_markup)
+    await update.message.reply_text("✅ Бот работает через webhook!")
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.callback_query.answer()
-    await update.callback_query.edit_message_text(text="Ты нажал кнопку!")
+
+async def handle(request):
+    # Обработчик POST запроса от Telegram
+    app = request.app['telegram_app']
+    update = Update.de_json(await request.json(), app.bot)
+    await app.update_queue.put(update)
+    return web.Response(text='OK')
+
 
 async def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
+    app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button))
 
-    print("✅ Бот запущен")
-    await app.run_polling()
+    # Создаем aiohttp приложение
+    web_app = web.Application()
+    web_app['telegram_app'] = app
+    web_app.router.add_post(WEBHOOK_PATH, handle)
+
+    # Устанавливаем webhook
+    await app.bot.delete_webhook()
+    await app.bot.set_webhook(WEBHOOK_URL)
+
+    # Запускаем бота и aiohttp сервер параллельно
+    runner = web.AppRunner(web_app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+
+    print(f"🚀 Webhook запущен: {WEBHOOK_URL}")
+
+    # Запуск обработки апдейтов
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()  # или лучше app.updater.start_webhook(), но здесь мы запускаем через aiohttp свой сервер
+    await app.updater.wait()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
