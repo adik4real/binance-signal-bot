@@ -4,7 +4,7 @@ from aiohttp import web
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("7697993850:AAFXT0gI310499hrGUWwE3YUZr40jlHLzzo")
 WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
 WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 WEBHOOK_URL = f"https://{WEBHOOK_HOST}{WEBHOOK_PATH}"
